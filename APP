@@ -1,0 +1,105 @@
+import requests, json, datetime, boto3
+
+from xml.etree import ElementTree
+
+
+def lambda_handler(event, context):
+    # TODO implement
+    print(event)
+    #---HERE WE ARE SEND POST REQUESTS
+    url = "https://apps.geopostuk.com/trackingcore/dpd/parcels"
+    payload = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<trackingrequest>\r\n<user>###insert_user###</user>\r\n<password>#####insert password#####</password>\r\n<trackingnumbers>\r\n<trackingnumber>{TN}</trackingnumber>\r\n</trackingnumbers>\r\n</trackingrequest>"
+    all_in = payload.format(TN=event["body-json"]["CN"])
+    headers = {
+        'Content-Type': 'application/xml',
+    }
+    response = requests.request("POST", url, headers=headers, data=all_in)
+    # --- NOW WE GOT THE RESPONSE WE NEED TO GET THE DATA OUT OF IT WE ARE USING ElementTree FOR THIS AS THE RESPONSE IS IN XML
+
+    response_XML = response.text.encode('utf8')
+
+    myroot = ElementTree.fromstring(response_XML)
+
+    trackingevent = myroot.findall('trackingdetails/trackingdetail/trackingevents/trackingevent')
+
+    str = "{}".format(response_XML)
+
+    # --- NOW WE MAKE AN IF STATEMENT TO DETERMINE IF THE TRACKING NUMBER IS VALET, WE ARE ALSO FORMATTING THE DATA.
+    if 'error' in str:
+        N4 = "PARCEL NOT FOUND"
+        N = "".format(datetime.datetime.now)
+        M = N[:10]
+
+    else:
+
+        N = trackingevent[0].find('date').text
+        M = N[:10]
+        N2 = trackingevent[0].find('type').text
+        N3 = trackingevent[0].find('description').text
+        N4 = "{} ---> {}".format(N2, N3)
+
+    #OUR CRM HAS A LIMITE TO HOW ONLY CALL CAN BE MADE IN A MINITE SO WE NEED TO SAVE OUR oauthtoken SO WHAT WE GOING NOW IS GETTING THE LAST oauthtoken
+
+    s3 = boto3.client("s3")
+    file = s3.get_object(Bucket="####insert bucket_name####", Key="####insert file path###")
+    contents = file["Body"].read().decode('utf-8')
+    print(contents)
+
+    # NOW WE TAKING OUR SAVED oauthtoken AND USING IT FOR IN OUR POST request
+
+    Authorization = "Zoho-oauthtoken {}".format(contents)
+
+    url_crm = "https://www.zohoapis.com/crm/v2/Shippments/{}".format(event["body-json"]["ID"])
+    payload_crm = {
+        "data": [
+            {
+                "TRANKER": N4,
+                "LAST_UPDATED": M
+
+            }
+        ],
+        "trigger": [
+            "approval"
+        ]
+    };
+    headers_crm = {
+        'Authorization': Authorization,
+        'Content-Type': 'application/json'
+    }
+    response_crm = requests.request("PUT", url_crm, headers=headers_crm, json=payload_crm)
+    print(response_crm.text.encode('utf8'))
+    response_crm_encode = response_crm.text.encode('utf8')
+    response_crm_encode_STR = "{}".format(response_crm_encode)
+
+    #NOW WE ARE CHECKING TO SEE IF THE oauth token IS STILL VALUE AND IF IT NOT WE ARE GETTING A NEW ONE AND SAVING IT AND SENDING THE response AGAIN HOWEVER IF WE GOT NO ERROR WE DONT NEED TO DO ANYTHING
+    if 'error' in response_crm_encode_STR:
+        url_token = "https://accounts.zoho.com/oauth/v2/token?refresh_########## YOU WILL NEED TO USE YOUR OWN ################### refresh_token"
+        headers_token = {
+            'Cookie': 'b266a5bf57=a711b6da0e6cbadb5e254290f114a026; iamcsr=1383a75c-689d-42de-9d7c-a20681fa117a; _zcsr_tmp=1383a75c-689d-42de-9d7c-a20681fa117a; JSESSIONID=64A54425B2F4E3BC15E3B90C7FAA9FDF'
+        }
+        response_token = requests.request("POST", url_token, headers=headers_token, )
+        response_token_json = response_token.json()
+        access_token = response_token_json['access_token']
+        NEW = access_token
+        s31 = boto3.resource('s3')
+        object = s31.Object('####insert bucket_name####', '####insert file path###')
+        object.put(Body=NEW)
+        file = s3.get_object(Bucket="####insert bucket_name####", Key="####insert file path###")
+        contents = file["Body"].read().decode('utf-8')
+        print(contents)
+        # HERE WE SENDING THE response AGAIN
+        Zoho-oauthtoken = "Zoho-oauthtoken {}".format(contents)
+        headers_crm = {
+            'Authorization': Zoho-oauthtoken,
+            'Content-Type': 'application/json'
+        }
+        response_now = requests.request("PUT", url_crm, headers=headers_crm, json=payload_crm)
+        now = response_now.text.encode('utf8')
+        print(now)
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps('Hello from Lambda!')
+    }
+
+
