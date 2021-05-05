@@ -75,7 +75,7 @@ def lambda_handler(event, context):
     if 'error' in response_crm_encode_STR:
         url_token = "https://accounts.zoho.com/oauth/v2/token?refresh_########## YOU WILL NEED TO USE YOUR OWN ################### refresh_token"
         headers_token = {
-            'Cookie': 'b266a5bf57=a711b6da0e6cbadb5e254290f114a026; iamcsr=1383a75c-689d-42de-9d7c-a20681fa117a; _zcsr_tmp=1383a75c-689d-42de-9d7c-a20681fa117a; JSESSIONID=64A54425B2F4E3BC15E3B90C7FAA9FDF'
+            'Cookie': '######; iamcsr=####-689d-42de-9d7c-a20681fa117a; _zcsr_tmp=###-689d-42de-9d7c-a20681fa117a; JSESSIONID=####'
         }
         response_token = requests.request("POST", url_token, headers=headers_token, )
         response_token_json = response_token.json()
